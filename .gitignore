@@ -1,0 +1,18 @@
+# Read-only reference clones (see docs/research/findings.md)
+external/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Training outputs
+logs/
+wandb/
+outputs/
+
+# OS / editor
+.DS_Store
+Thumbs.db
