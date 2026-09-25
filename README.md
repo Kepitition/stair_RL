@@ -84,7 +84,7 @@ Do not change `g1_stairs/scene/` in a variant. If the scene needs to change, pro
 
 ## Known issues (starting points for reward design)
 
-The baseline is Unitree's flat and rough-terrain setup, unchanged:
+The baseline is Unitree's flat and rough-terrain setup, unchanged except for the height-scan noise. Unitree adds ±0.1 m per ray, as large as a riser; the baseline uses the model BeamDojo deployed on a real G1 with the MID-360 LiDAR: ±0.03 m per ray and step, plus one ±0.03 m offset per episode shared by all rays. The actor also sees the scan 0 or 1 policy step (0-20 ms) late. Other known issues:
 
 - `foot_clearance` targets 0.10 m of absolute height, so on stairs it penalizes a foot for standing on a higher step. Use `foot_scan_*` for the height above the ground under each foot.
 - The gait clock has a fixed 0.6 s period, and there is no step-length command yet.

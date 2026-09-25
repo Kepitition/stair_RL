@@ -1,6 +1,9 @@
 """G1-Stairs-Baseline: Unitree's Rough MDP on the shared scene (spec §6.1)."""
 
+import copy
+
 import pytest
+import torch
 from mjlab.tasks.registry import (
   list_tasks,
   load_env_cfg,
@@ -9,8 +12,11 @@ from mjlab.tasks.registry import (
   register_mjlab_task,
 )
 
+from mjlab.utils.noise import UniformNoiseCfg as Unoise
+
 import g1_stairs.tasks  # noqa: F401  (registers the tasks)
 from g1_stairs.runner import VelocityOnPolicyRunner
+from g1_stairs.tasks.baseline.env_cfg import HEIGHT_SCAN_OFFSET
 
 TASK = "G1-Stairs-Baseline"
 
@@ -58,6 +64,35 @@ def test_unitree_rewards_and_observations_unchanged():
   assert {k: v.weight for k, v in cfg.rewards.items()} == UNITREE_REWARD_WEIGHTS
   assert list(cfg.observations["actor"].terms) == UNITREE_ACTOR_TERMS
   assert cfg.commands["twist"].ranges.lin_vel_x == (-1.0, 2.0)
+
+
+def test_height_scan_noise_matches_real_lidar():
+  # Per-ray noise plus a per-episode offset, both U(-0.03, 0.03) m (BeamDojo, G1 + MID-360).
+  cfg = load_env_cfg(TASK)
+  noise = cfg.observations["actor"].terms["height_scan"].noise
+  assert (noise.noise_cfg.n_min, noise.noise_cfg.n_max) == (-0.03, 0.03)
+  assert (noise.bias_noise_cfg.n_min, noise.bias_noise_cfg.n_max) == (-0.03, 0.03)
+  assert cfg.observations["critic"].terms["height_scan"].noise is None
+
+
+def test_height_scan_lag_is_at_most_one_policy_step():
+  cfg = load_env_cfg(TASK)
+  actor = cfg.observations["actor"].terms["height_scan"]
+  assert (actor.delay_min_lag, actor.delay_max_lag) == (0, 1)
+  assert cfg.observations["critic"].terms["height_scan"].delay_max_lag == 0
+
+
+def test_height_scan_offset_is_shared_and_does_not_drift():
+  noise_cfg = copy.deepcopy(load_env_cfg(TASK).observations["actor"].terms["height_scan"].noise)
+  noise_cfg.noise_cfg = Unoise(n_min=0.0, n_max=1e-9)  # isolate the offset
+  model = noise_cfg.class_type(noise_cfg, num_envs=64, device="cpu")
+  for _ in range(200):
+    model.reset()
+  out = model(torch.zeros(64, 187))
+  # One offset per env, shared by every ray, still inside its range after many resets.
+  assert torch.allclose(out, out[:, :1].expand_as(out), atol=1e-6)
+  assert out.abs().max() <= HEIGHT_SCAN_OFFSET + 1e-6
+  assert out.std() > 0.005
 
 
 def test_play_config():

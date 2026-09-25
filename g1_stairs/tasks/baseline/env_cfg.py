@@ -3,8 +3,9 @@
 """G1-Stairs-Baseline: Unitree's Unitree-G1-23Dof-Rough MDP on the shared stairs scene.
 
 Rewards, weights, observations, events, terminations and curricula are Unitree's,
-unchanged (spec §6.1). Only the scene comes from g1_stairs.scene. This is the
-template for variants: copy this folder and change what you need.
+unchanged (spec §6.1), except the height-scan noise (see _height_scan_noise). Only
+the scene comes from g1_stairs.scene. This is the template for variants: copy this
+folder and change what you need.
 """
 
 import math
@@ -21,6 +22,7 @@ from mjlab.managers.reward_manager import RewardTermCfg
 from mjlab.managers.scene_entity_config import SceneEntityCfg
 from mjlab.managers.termination_manager import TerminationTermCfg
 from mjlab.tasks.velocity.mdp import UniformVelocityCommandCfg
+from mjlab.utils.noise import NoiseModelWithAdditiveBiasCfg
 from mjlab.utils.noise import UniformNoiseCfg as Unoise
 from mjlab.viewer import ViewerConfig
 
@@ -44,6 +46,32 @@ from g1_stairs.scene.sensors import (
   TERRAIN_SCAN,
   TERRAIN_SCAN_MAX_DISTANCE,
 )
+
+# Height-scan noise on the actor, in meters (mjlab adds noise before scaling).
+# Values from BeamDojo (arXiv:2502.10363, Table IX), deployed on a real G1 with the
+# head-mounted Livox MID-360 and an elevation map: U(-0.03, 0.03) m per ray and
+# step, plus one U(-0.03, 0.03) m vertical offset per episode shared by all rays.
+# The MID-360 datasheet gives a range precision (1 sigma) of 2-3 cm. Unitree's
+# 0.1 m per ray is as large as a riser and hides the step edges.
+HEIGHT_SCAN_NOISE = 0.03
+HEIGHT_SCAN_OFFSET = 0.03
+# Lag of the actor's height scan, in policy steps (20 ms each), sampled per env and
+# step. Covers the pose-estimation and processing delay of cropping the map around
+# the robot. The map itself refreshes at ~10 Hz on hardware, but stairs are static,
+# so that slower refresh is not modeled as lag.
+HEIGHT_SCAN_MAX_LAG = 1
+
+
+def _height_scan_noise() -> NoiseModelWithAdditiveBiasCfg:
+  return NoiseModelWithAdditiveBiasCfg(
+    noise_cfg=Unoise(n_min=-HEIGHT_SCAN_NOISE, n_max=HEIGHT_SCAN_NOISE),
+    # "abs" draws a fresh offset on reset; mjlab's default "add" would sum it onto
+    # the previous episode's offset, so the offset would drift over training.
+    bias_noise_cfg=Unoise(
+      n_min=-HEIGHT_SCAN_OFFSET, n_max=HEIGHT_SCAN_OFFSET, operation="abs"
+    ),
+    sample_bias_per_component=False,
+  )
 
 # Unitree's per-joint posture tolerances for the G1 23-DOF.
 _POSE_STD_WALKING = {
@@ -107,8 +135,10 @@ def _observations() -> dict[str, ObservationGroupCfg]:
     "height_scan": ObservationTermCfg(
       func=envs_mdp.height_scan,
       params={"sensor_name": TERRAIN_SCAN},
-      noise=Unoise(n_min=-0.1, n_max=0.1),
+      noise=_height_scan_noise(),
       scale=1 / TERRAIN_SCAN_MAX_DISTANCE,
+      delay_min_lag=0,
+      delay_max_lag=HEIGHT_SCAN_MAX_LAG,
     ),
   }
   critic_terms = {
