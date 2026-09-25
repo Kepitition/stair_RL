@@ -1,0 +1,13 @@
+g1-stairs-rl
+
+This project contains code and assets derived from unitree_rl_mjlab
+(https://github.com/unitreerobotics/unitree_rl_mjlab), Copyright Unitree
+Robotics, licensed under the Apache License, Version 2.0. A copy of that
+license is in LICENSES/unitree_rl_mjlab-LICENSE.
+
+Derived files (each starts with a header naming its source):
+- g1_stairs/assets/g1_23dof/  (MJCF model, meshes, constants.py)
+- g1_stairs/mdp/              (rewards, observations, curriculums, terminations)
+- g1_stairs/runner.py
+- g1_stairs/tasks/baseline/   (environment and PPO configuration)
+- scripts/train.py, scripts/play.py, scripts/list_envs.py
