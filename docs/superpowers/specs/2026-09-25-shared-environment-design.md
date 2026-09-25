@@ -55,10 +55,14 @@ g1-stairs-rl/
   requirements.txt          one-command install, including "-e ."
   requirements.lock.txt     pip freeze from the passing acceptance run
   NOTICE                    attribution for code and assets from unitree_rl_mjlab (Apache-2.0)
+  LICENSES/                 copy of unitree_rl_mjlab's Apache-2.0 license
+  .gitattributes            marks meshes as binary
   scripts/
     train.py  play.py  list_envs.py  view_scene.py
   g1_stairs/
-    __init__.py             imports g1_stairs.tasks, which registers all tasks
+    __init__.py             package root (REPO_ROOT); scripts import g1_stairs.tasks to register tasks
+    runtime.py              script helpers: log paths, render backend, viewer choice, dummy policies
+    runner.py               Unitree's VelocityOnPolicyRunner (ONNX export on save)
     assets/g1_23dof/        g1_23dof.xml, meshes used by it, constants.py
     scene/
       robot.py              robot entity config and action scale
@@ -121,6 +125,7 @@ Linux works the same, with `source .venv/bin/activate`. `pyproject.toml` lists t
 | `flat` | 35% | `BoxFlatTerrainCfg` | |
 
 - **Starting level:** `max_init_terrain_level = 2`.
+- **Fixed seed:** `seed = 42`. mjlab's default draws a random seed on every run, which would give each run and each teammate a different terrain.
 - **No heightfield or box-grid tiles** (see §2). Robustness to uneven ground comes from pushes, friction randomization and height-scan noise.
 - **Play mode:** a random 5 × 5 tile grid, no curriculum.
 - **Scene viewer:** the full curriculum grid, with robots spread over all rows.
@@ -167,6 +172,7 @@ Each variant chooses which sensors its policy, critic and rewards use.
   - `experiment_name="g1_stairs_baseline"`
   - `max_iterations=5000`, overridable with `--agent.max-iterations`
 - **Runner:** Unitree's `VelocityOnPolicyRunner`, which exports `policy.onnx` on every save.
+- **Velocity command:** mjlab's `UniformVelocityCommandCfg`, exactly what Unitree's Rough task uses. Unitree's own copy in their `mdp/velocity_command.py` is never used by that task, so we don't copy it.
 - **Play mode:** Unitree's play overrides on the play terrain.
 
 ### 6.2 Adding a variant
@@ -181,7 +187,7 @@ Each variant chooses which sensors its policy, critic and rewards use.
 
 The scripts are adapted from `unitree_rl_mjlab/scripts` and run as `python scripts/<name>.py` from the repo root.
 
-- **`train.py <task>`:** tyro CLI as upstream (`--env.*`, `--agent.*` overrides). It does not set `MUJOCO_GL=egl` on Windows (upstream sets it unconditionally), and it writes YAML and logs as UTF-8.
+- **`train.py <task>`:** tyro CLI as upstream (`--env.*`, `--agent.*` overrides), single GPU. It sets `MUJOCO_GL=egl` only on Linux, and only if the user hasn't set it (upstream sets it unconditionally). Logs go to `<repo>/logs/rsl_rl/` wherever the script is run from. The YAML config dumps need no encoding fix, because PyYAML escapes non-ASCII characters by default.
 - **`play.py <task> --checkpoint-file <path>`:** `--agent zero|random` needs no checkpoint. `--viewer` defaults to `native` on Windows (upstream's `auto` checks `DISPLAY`, which Windows lacks, and picks Viser). `--video` records to the run folder.
 - **`view_scene.py [--num-envs 64] [--viewer native|viser]`:** the full training terrain, robots on every row, zero policy.
 - **`list_envs.py`:** prints the registered `G1-Stairs-*` tasks.
