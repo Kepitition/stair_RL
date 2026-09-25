@@ -9,8 +9,8 @@ The **scene** is identical for everyone: robot, stairs terrain, sensors and phys
 You need an NVIDIA GPU with at least 8 GB (driver with CUDA 12.8 support), Python 3.10–3.13 and git.
 
 ```bash
-git clone <repo-url> g1-stairs-rl
-cd g1-stairs-rl
+git clone https://github.com/Kepitition/stair_RL.git
+cd stair_RL
 python -m venv .venv
 .venv\Scripts\activate            # Linux: source .venv/bin/activate
 pip install -r requirements.txt   # CUDA torch + pinned mjlab stack + this package
